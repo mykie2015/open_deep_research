@@ -1,7 +1,7 @@
-
 import os
 import asyncio
 import requests
+from typing import Any
 
 from tavily import TavilyClient, AsyncTavilyClient
 from open_deep_research.state import Section
@@ -10,11 +10,27 @@ from langsmith import traceable
 tavily_client = TavilyClient()
 tavily_async_client = AsyncTavilyClient()
 
-def get_config_value(value):
-    """
-    Helper function to handle both string and enum cases of configuration values
-    """
-    return value if isinstance(value, str) else value.value
+def get_config_value(value: Any, config: Configuration) -> Any:
+    """Handle model configurations with API keys and base URLs."""
+    if hasattr(value, "value"):
+        provider = value.value
+        if provider == "openai":
+            return {
+                "provider": provider,
+                "api_key": config.openai_api_key,
+                "api_base": config.openai_base_url
+            }
+        elif provider == "anthropic":
+            return {
+                "provider": provider,
+                "api_key": config.anthropic_api_key
+            }
+        elif provider == "groq":
+            return {
+                "provider": provider,
+                "api_key": config.groq_api_key
+            }
+    return value
 
 def deduplicate_and_format_sources(search_response, max_tokens_per_source, include_raw_content=True):
     """
@@ -157,7 +173,7 @@ def perplexity_search(search_queries):
     headers = {
         "accept": "application/json",
         "content-type": "application/json",
-        "Authorization": f"Bearer {os.getenv('PERPLEXITY_API_KEY')}"
+        "Authorization": f"Bearer {Configuration.from_runnable_config().perplexity_api_key}"
     }
     
     search_docs = []

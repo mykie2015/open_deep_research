@@ -31,9 +31,24 @@ async def generate_report_plan(state: ReportState, config: RunnableConfig):
         report_structure = str(report_structure)
 
     # Set writer model (model used for query writing and section writing)
-    writer_provider = get_config_value(configurable.writer_provider)
-    writer_model_name = get_config_value(configurable.writer_model)
-    writer_model = init_chat_model(model=writer_model_name, model_provider=writer_provider, temperature=0) 
+    writer_provider_config = get_config_value(configurable.writer_provider, configurable)
+    writer_model_name = configurable.writer_model
+    writer_model = init_chat_model(model=writer_model_name, **writer_provider_config, temperature=0)
+    
+    if isinstance(writer_provider_config, dict):
+        writer_model = init_chat_model(
+            model=writer_model_name,
+            model_provider=writer_provider_config["provider"],
+            temperature=0,
+            openai_api_key=writer_provider_config.get("api_key"),
+            openai_api_base=writer_provider_config.get("api_base")
+        )
+    else:
+        writer_model = init_chat_model(
+            model=writer_model_name,
+            model_provider=writer_provider_config,
+            temperature=0
+        )
     structured_llm = writer_model.with_structured_output(Queries)
 
     # Format system instructions
@@ -74,7 +89,8 @@ async def generate_report_plan(state: ReportState, config: RunnableConfig):
         planner_model = configurable.planner_model.value
 
     # Set the planner model
-    planner_llm = init_chat_model(model=planner_model, model_provider=planner_provider)
+    planner_provider_config = get_config_value(configurable.planner_provider, configurable)
+    planner_llm = init_chat_model(model=planner_model, **planner_provider_config)
     
     # Generate sections 
     structured_llm = planner_llm.with_structured_output(Sections)
